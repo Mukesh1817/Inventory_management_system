@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+    <div class="dashboard-container">
+        <header class="dashboard-header">
+            <h1>Inventory Dashboard</h1>
+            <div class="user-info">
+                <span>Welcome, {{ session.user }}</span>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+        </header>
+
+        <nav class="sidebar">
+            <ul>
+                <li class="active"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                <li><a href="{{ url_for('add_stock') }}">Add Stock</a></li>
+                <li><a href="{{ url_for('sales_history') }}">Sales History</a></li>
+            </ul>
+        </nav>
+
+        <main class="main-content">
+            <div class="tabs">
+                <button onclick="showTab('television-tab')">Televisions</button>
+                <button onclick="showTab('accessory-tab')">Accessories & Utilities</button>
+            </div>
+
+            <div id="television-tab" class="tab-content">
+                <div class="summary-cards">
+                    <div class="card"><h3>Total Stock</h3><p class="value">{{ total_stock }}</p></div>
+                    <div class="card"><h3>Available</h3><p class="value">{{ available_count }}</p></div>
+                    <div class="card"><h3>B2C Sales</h3><p class="value">{{ b2c_sales }}</p></div>
+                    <div class="card"><h3>B2B Sales</h3><p class="value">{{ b2b_sales }}</p></div>
+                </div>
+                <div class="inventory-table">
+                    <div class="table-header">
+                        <h2>Television Inventory</h2>
+                        <button class="sales-btn" onclick="openModal('tv')">Sales</button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr><th>Serial number</th><th>Brand</th><th>Size</th><th>Edit</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for tv in available_tvs %}
+                            <tr>
+    <td>{{ tv.serial_number }}</td>
+    <td>{{ tv.brand }}</td>
+    <td>{{ tv.size }}</td>
+    <td>
+        <button class="edit-btn" onclick="openEditModal('{{ tv.id }}', '{{ tv.serial_number }}', '{{ tv.brand }}', '{{ tv.size }}')">
+            Edit
+        </button>
+    </td>
+</tr>
+                            {% else %}
+                            <tr><td colspan="4">No available TVs</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="accessory-tab" class="tab-content" style="display:none;">
+                <div class="summary-cards">
+                    <div class="card"><h3>Total Accessories</h3><p class="value">{{ total_accessories }}</p></div>
+                    <div class="card"><h3>Main Stock</h3><p class="value">{{ main_stock }}</p></div>
+                    <div class="card"><h3>Prabhu</h3><p class="value">{{ prabhu_stock }}</p></div>
+                    <div class="card"><h3>Tamil</h3><p class="value">{{ tamil_stock }}</p></div>
+                </div>
+                <div class="inventory-table">
+                    <div class="table-header">
+                        <h2>Accessory Stock</h2>
+                        <div class="action-buttons">
+                            <button class="sales-btn" onclick="openModal('accessory')">Sales</button>
+                            <button class="transfer-btn" onclick="openTransferModal()">Transfer Stock</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr><th>Item</th><th>Main</th><th>Prabhu</th><th>Tamil</th><th>Total</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for item in accessory_items %}
+                            <tr>
+                                <td>{{ item.item_name }}</td>
+                                <td>{{ item.main_stock }}</td>
+                                <td>{{ item.prabhu_stock }}</td>
+                                <td>{{ item.tamil_stock }}</td>
+                                <td>{{ item.main_stock + item.prabhu_stock + item.tamil_stock }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5">No accessories in stock</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Sales Modal -->
+    <div id="salesModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+
+            <!-- TV Sale Type Options -->
+            <div id="sales-type-section">
+                <h3>Choose Sale Type</h3>
+                <button onclick="showB2CForm()">B2C</button>
+                <button onclick="showB2BForm()">B2B</button>
+            </div>
+
+            <!-- B2C TV Sale -->
+<form id="b2c-form" action="/submit_b2c_tv_sale" method="POST" style="display: none;">
+    <h3>Television B2C Sale</h3>
+    <input type="text" name="name" placeholder="Customer Name" required>
+    <input type="text" name="serial" id="b2c-serial" list="serial-list" placeholder="Serial Number" required
+           oninput="validateSerial(this, 'b2c-serial-error', 'b2c-submit')">
+    <div id="b2c-serial-error" class="error-message">Serial number not available in inventory</div>
+
+    <p>Brand: <span id="b2c-brand-display"></span></p>
+    <p>Size: <span id="b2c-size-display"></span></p>
+
+    <select name="warranty" required>
+        <option value="">Select Warranty</option>
+        <option value="With Warranty">With Warranty</option>
+        <option value="Without Warranty">Without Warranty</option>
+    </select>
+
+    <input type="date" name="date" required>
+    <input type="number" name="phone" placeholder="Phone" required>
+    <input type="number" name="price" placeholder="Price" required>
+    <button type="submit" id="b2c-submit" disabled>Submit Sale</button>
+</form>
+
+<form id="b2b-form" action="/submit_b2b_tv_sale" method="POST" style="display: none;">
+    <h3>Television B2B Sale</h3>
+    <input type="text" name="name" placeholder="Business Name" required>
+    <input type="text" name="serial" id="b2b-serial" list="serial-list" placeholder="Serial Number" required
+           oninput="validateSerial(this, 'b2b-serial-error', 'b2b-submit')">
+    <div id="b2b-serial-error" class="error-message">Serial number not available in inventory</div>
+
+    <p>Brand: <span id="b2b-brand-display"></span></p>
+    <p>Size: <span id="b2b-size-display"></span></p>
+
+    <select name="warranty" required>
+        <option value="">Select Warranty</option>
+        <option value="With Warranty">With Warranty</option>
+        <option value="Without Warranty">Without Warranty</option>
+    </select>
+
+    <input type="date" name="date" required>
+    <input type="number" name="phone" placeholder="Phone" required>
+    <input type="number" name="price" placeholder="Price" required>
+    <button type="submit" id="b2b-submit" disabled>Submit Sale</button>
+</form>
+
+            <!-- Accessory Sale -->
+            <form id="accessory-sale-form" action="/submit_accessory_sale" method="POST" style="display: none;">
+                <h3>Accessory B2C Sale</h3>
+                <input type="text" name="name" placeholder="Customer Name" required>
+                <select id="accessory-type" name="item" onchange="toggleAccessorySerial()" required>
+                    <option value="">Select Accessory</option>
+                    {% for item in accessory_items %}
+                        <option value="{{ item.item_name }}">{{ item.item_name }}</option>
+                    {% endfor %}
+                </select>
+                <div id="accessory-serial-container" style="display: none;">
+                    <input type="text" placeholder="Serial Number">
+                </div>
+                <input type="date" name="date" required>
+                <label for="labour">Sold By</label>
+                <select name="labour" required>
+                    <option value="">Select Labour</option>
+                    <option value="main">Main Stock</option>
+                    <option value="prabhu">Prabhu</option>
+                    <option value="tamil">Tamil</option>
+                </select>
+                <input type="number" name="phone" placeholder="Phone" required>
+                <input type="number" name="price" placeholder="Price" required>
+                <input type="number" name="quantity" placeholder="Quantity" required>
+                <button type="submit">Submit Sale</button>
+            </form>
+
+            <datalist id="serial-list"></datalist>
+        </div>
+    </div>
+
+    <!-- Transfer Modal -->
+    <div id="transferModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeTransferModal()">&times;</span>
+            <h3>Transfer Accessory Stock</h3>
+            <form id="transfer-form" action="/transfer_accessory" method="POST">
+                <select name="item_name" required>
+                    <option value="">Select Item</option>
+                    {% for item in accessory_items %}
+                        <option value="{{ item.item_name }}">{{ item.item_name }}</option>
+                    {% endfor %}
+                </select>
+                
+                <div class="transfer-group">
+                    <label>From:</label>
+                    <select name="from" required>
+                        <option value="main">Main Stock</option>
+                        <option value="prabhu">Prabhu</option>
+                        <option value="tamil">Tamil</option>
+                    </select>
+                    
+                    <label>To:</label>
+                    <select name="to" required>
+                        <option value="main">Main Stock</option>
+                        <option value="prabhu">Prabhu</option>
+                        <option value="tamil">Tamil</option>
+                    </select>
+                </div>
+                
+                <input type="number" name="quantity" placeholder="Quantity" min="1" required>
+                <button type="submit">Transfer</button>
+            </form>
+        </div>
+    </div>
+
+<!-- Edit TV Modal -->
+<div id="editTVModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeEditModal()">&times;</span>
+    <h3>Edit TV Details</h3>
+    <form id="edit-tv-form" action="/edit_tv" method="POST">
+      <input type="hidden" name="id" id="edit-tv-id">
+      <label for="edit-serial">Serial Number</label>
+      <input type="text" name="serial_number" id="edit-serial" required>
+      <label for="edit-brand">Brand</label>
+      <input type="text" name="brand" id="edit-brand" required>
+      <label for="edit-size">Size</label>
+      <input type="text" name="size" id="edit-size" required>
+      <button type="submit">Update</button>
+    </form>
+  </div>
+</div>
+
+
+    <!-- Scripts -->
+<script id="tv-json-data" type="application/json">
+  {{ available_tvs | tojson }}
+</script>
+
+<script>
+    let availableSerials = [];
+    let tvData = [];
+
+    function showTab(tabId) {
+        document.getElementById('television-tab').style.display = 'none';
+        document.getElementById('accessory-tab').style.display = 'none';
+        document.getElementById(tabId).style.display = 'block';
+    }
+
+    function openModal(type) {
+        document.getElementById("salesModal").style.display = "block";
+        document.getElementById("sales-type-section").style.display = type === "tv" ? "block" : "none";
+        document.getElementById("b2c-form").style.display = "none";
+        document.getElementById("b2b-form").style.display = "none";
+        document.getElementById("accessory-sale-form").style.display = type === "accessory" ? "block" : "none";
+
+        if (type === 'tv') {
+            document.getElementById('b2c-form').reset();
+            document.getElementById('b2b-form').reset();
+            document.getElementById('b2c-submit').disabled = true;
+            document.getElementById('b2b-submit').disabled = true;
+            document.getElementById('b2c-serial-error').style.display = 'none';
+            document.getElementById('b2b-serial-error').style.display = 'none';
+            document.getElementById('b2c-brand-display').textContent = '';
+            document.getElementById('b2c-size-display').textContent = '';
+            document.getElementById('b2b-brand-display').textContent = '';
+            document.getElementById('b2b-size-display').textContent = '';
+        }
+    }
+
+    function openEditModal(id, serial, brand, size) {
+        // Escape HTML to prevent XSS
+        const escapeHtml = (text) => {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        };
+        
+        document.getElementById("edit-tv-id").value = escapeHtml(id);
+        document.getElementById("edit-serial").value = escapeHtml(serial);
+        document.getElementById("edit-brand").value = escapeHtml(brand);
+        document.getElementById("edit-size").value = escapeHtml(size);
+        document.getElementById("editTVModal").style.display = "block";
+        
+        // Focus on first input field
+        document.getElementById("edit-serial").focus();
+    }
+
+    function closeEditModal() {
+        document.getElementById("editTVModal").style.display = "none";
+    }
+
+    function closeModal() {
+        document.getElementById("salesModal").style.display = "none";
+    }
+
+    function openTransferModal() {
+        document.getElementById("transferModal").style.display = "block";
+    }
+
+    function closeTransferModal() {
+        document.getElementById("transferModal").style.display = "none";
+    }
+
+    function showB2CForm() {
+        document.getElementById("sales-type-section").style.display = "none";
+        document.getElementById("b2c-form").style.display = "block";
+    }
+
+    function showB2BForm() {
+        document.getElementById("sales-type-section").style.display = "none";
+        document.getElementById("b2b-form").style.display = "block";
+    }
+
+    function validateSerial(inputElement, errorElementId, submitButtonId, brandSpanId, sizeSpanId) {
+        const serial = inputElement.value.trim();
+        const errorElement = document.getElementById(errorElementId);
+        const submitButton = document.getElementById(submitButtonId);
+        const matchedTV = tvData.find(tv => tv.serial_number === serial);
+
+        if (serial === '') {
+            errorElement.style.display = 'none';
+            submitButton.disabled = true;
+            inputElement.classList.remove('invalid');
+            document.getElementById(brandSpanId).textContent = '';
+            document.getElementById(sizeSpanId).textContent = '';
+            return;
+        }
+
+        if (!availableSerials.includes(serial)) {
+            errorElement.style.display = 'block';
+            submitButton.disabled = true;
+            inputElement.classList.add('invalid');
+            document.getElementById(brandSpanId).textContent = '';
+            document.getElementById(sizeSpanId).textContent = '';
+        } else {
+            errorElement.style.display = 'none';
+            submitButton.disabled = false;
+            inputElement.classList.remove('invalid');
+            if (matchedTV) {
+                document.getElementById(brandSpanId).textContent = matchedTV.brand;
+                document.getElementById(sizeSpanId).textContent = matchedTV.size;
+            }
+        }
+    }
+
+    function toggleAccessorySerial() {
+        const accessory = document.getElementById("accessory-type").value;
+        document.getElementById("accessory-serial-container").style.display = accessory === "stabilizer" ? "block" : "none";
+    }
+
+    function logout() {
+        window.location.href = "{{ url_for('logout') }}";
+    }
+
+    window.onload = function () {
+        const jsonData = document.getElementById("tv-json-data").textContent;
+        tvData = JSON.parse(jsonData);
+
+        fetch('/get_available_serials')
+            .then(response => response.json())
+            .then(data => {
+                availableSerials = data.serials;
+                const datalist = document.getElementById('serial-list');
+                datalist.innerHTML = '';
+                data.serials.forEach(serial => {
+                    const option = document.createElement('option');
+                    option.value = serial;
+                    datalist.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error fetching serials:', error));
+
+        // Attach event listeners after DOM & data are ready
+        document.getElementById('b2c-serial').addEventListener('input', function () {
+            validateSerial(this, 'b2c-serial-error', 'b2c-submit', 'b2c-brand-display', 'b2c-size-display');
+        });
+
+        document.getElementById('b2b-serial').addEventListener('input', function () {
+            validateSerial(this, 'b2b-serial-error', 'b2b-submit', 'b2b-brand-display', 'b2b-size-display');
+        });
+
+        // Add edit form validation
+        const editForm = document.getElementById('edit-tv-form');
+        if (editForm) {
+            editForm.addEventListener('submit', function(e) {
+                const serial = document.getElementById('edit-serial').value.trim();
+                const brand = document.getElementById('edit-brand').value.trim();
+                const size = document.getElementById('edit-size').value.trim();
+                
+                if (!serial || !brand || !size) {
+                    e.preventDefault();
+                    alert('Please fill in all fields');
+                }
+            });
+        }
+
+        // Click outside modal to close
+        window.onclick = function(event) {
+            const editModal = document.getElementById('editTVModal');
+            if (event.target == editModal) {
+                closeEditModal();
+            }
+            
+            const salesModal = document.getElementById('salesModal');
+            if (event.target == salesModal) {
+                closeModal();
+            }
+            
+            const transferModal = document.getElementById('transferModal');
+            if (event.target == transferModal) {
+                closeTransferModal();
+            }
+        }
+    }
+</script>
+</body>
+</html>

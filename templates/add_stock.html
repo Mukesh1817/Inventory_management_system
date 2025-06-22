@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Stock</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/add_stock.css') }}">
+    <style>
+        .suggestions-box {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ccc;
+            max-height: 150px;
+            overflow-y: auto;
+            z-index: 999;
+            font-size: 14px;
+        }
+
+        .suggestions-box div {
+            padding: 8px;
+            cursor: pointer;
+        }
+
+        .suggestions-box div:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <header class="dashboard-header">
+            <h1>Add New Stock</h1>
+            <div class="user-info">
+                <span>Welcome, {{ session.user }}</span>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+        </header>   
+
+        <nav class="sidebar">
+            <ul>
+                <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                <li class="active"><a href="{{ url_for('add_stock') }}">Add Stock</a></li>
+                <li><a href="{{ url_for('sales_history') }}">Sales History</a></li>
+            </ul>
+        </nav>
+
+        <main class="main-content">
+            <div class="tabs">
+                <button onclick="showTab('television-form')">Televisions</button>
+                <button onclick="showTab('accessory-form')">Accessories & Utilities</button>
+            </div>
+
+            <!-- Television Stock Form -->
+            <div class="form-container" id="television-form">
+                <form class="stock-form" action="/add_tv" method="POST">
+                    <div class="form-group">
+                        <label for="serial-number">Serial Number</label>
+                        <input type="text" id="serial-number" name="serial-number" class="form-control" placeholder="Enter serial number" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tv-brand">TV Brand</label>
+                        <select id="tv-brand" name="tv-brand" class="form-control" required onchange="toggleOtherBrand()">
+                            <option value="">Select Brand</option>
+                            <option>Nikko</option>
+                            <option>Nikashi</option>
+                            <option>Xiaomi</option>
+                            <option>Redmi</option>
+                            <option>Geestar</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="other-brand-group" style="display: none;">
+                        <label for="other-brand">Enter Brand Name</label>
+                        <input type="text" id="other-brand" class="form-control" placeholder="Enter other brand name">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tv-size">TV Size</label>
+                        <select id="tv-size" name="tv-size" class="form-control" required>
+                            <option value="">Select Size</option>
+                            <option>24</option>
+                            <option>32</option>
+                            <option>43</option>
+                            <option>50</option>
+                            <option>55</option>
+                            <option>65</option>
+                        </select>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="cancel-btn" onclick="window.location.href='/dashboard'">Cancel</button>
+                        <button type="submit" class="submit-btn">Save</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Accessory Stock Form -->
+            <div class="form-container" id="accessory-form" style="display: none;">
+                <form class="stock-form" action="/add_accessory" method="POST">
+                    <div class="form-group" style="position: relative;">
+                        <label for="accessory-name">Accessory Name</label>
+                        <input type="text" id="accessory-name" name="accessory-name" class="form-control" autocomplete="off" placeholder="Enter item name" required>
+                        <div id="accessory-suggestions" class="suggestions-box"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="main-stock">Add to Main Stock</label>
+                        <input type="number" id="main-stock" name="main-stock" class="form-control" min="0" value="0">
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="cancel-btn" onclick="window.location.href='/dashboard'">Cancel</button>
+                        <button type="submit" class="submit-btn">Save</button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function showTab(id) {
+            document.getElementById('television-form').style.display = 'none';
+            document.getElementById('accessory-form').style.display = 'none';
+            document.getElementById(id).style.display = 'block';
+        }
+
+        function logout() {
+            window.location.href = "{{ url_for('logout') }}";
+        }
+
+        function toggleOtherBrand() {
+            const brandSelect = document.getElementById("tv-brand");
+            const otherGroup = document.getElementById("other-brand-group");
+            const otherInput = document.getElementById("other-brand");
+
+            if (brandSelect.value === "other") {
+                otherGroup.style.display = "block";
+                otherInput.setAttribute("name", "tv-brand");
+                otherInput.setAttribute("required", "required");
+                brandSelect.removeAttribute("name");
+            } else {
+                otherGroup.style.display = "none";
+                otherInput.removeAttribute("name");
+                otherInput.removeAttribute("required");
+                brandSelect.setAttribute("name", "tv-brand");
+            }
+        }
+
+        // Accessory autocomplete
+        const accessoryInput = document.getElementById("accessory-name");
+        const suggestionBox = document.getElementById("accessory-suggestions");
+
+        accessoryInput.addEventListener("input", async function () {
+            const query = this.value.trim();
+            if (query.length < 1) {
+                suggestionBox.innerHTML = "";
+                return;
+            }
+
+            const res = await fetch(`/search_items?query=${encodeURIComponent(query)}`);
+            const data = await res.json();
+            
+            suggestionBox.innerHTML = "";
+            data.results.forEach(item => {
+                const div = document.createElement("div");
+                div.textContent = item;
+                div.onclick = () => {
+                    accessoryInput.value = item;
+                    suggestionBox.innerHTML = "";
+                };
+                suggestionBox.appendChild(div);
+            });
+        });
+
+        document.addEventListener("click", function (e) {
+            if (!suggestionBox.contains(e.target) && e.target !== accessoryInput) {
+                suggestionBox.innerHTML = "";
+            }
+        });
+    </script>
+</body>
+</html>
